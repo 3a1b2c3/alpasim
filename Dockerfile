@@ -22,6 +22,18 @@ RUN printf '%s\n' \
     >> /etc/dcgm-exporter/default-counters.csv
 
 ARG DEBIAN_FRONTEND=noninteractive
+ARG TARGETARCH
+
+# The amd64 base image (nvidia/cuda) ships with NVIDIA's CUDA apt repo
+# pre-configured; the arm64 base (NGC PyTorch container, Ubuntu 24.04) does
+# not, so datacenter-gpu-manager below is otherwise unresolvable there.
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+        apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
+        && curl -fsSL -o /tmp/cuda-keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/sbsa/cuda-keyring_1.1-1_all.deb \
+        && dpkg -i /tmp/cuda-keyring.deb \
+        && rm -f /tmp/cuda-keyring.deb; \
+    fi
+
 RUN apt-get update && apt-get install -y \
     git \
     ffmpeg \
