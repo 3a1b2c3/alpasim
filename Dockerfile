@@ -69,7 +69,12 @@ WORKDIR /repo
 
 RUN --mount=type=secret,id=netrc,target=/root/.netrc \
     --mount=type=cache,target=/root/.cache/uv \
-    sh -c 'if [ -f /root/.netrc ]; then export NETRC=/root/.netrc; fi && uv sync --extra all --extra recipes'
+    sh -c 'if [ -f /root/.netrc ]; then export NETRC=/root/.netrc; fi && \
+      if [ "$TARGETARCH" = "arm64" ]; then \
+        uv sync --extra plugins --extra controller --extra eval --extra grpc --extra runtime --extra utils --extra physics --extra driver --extra wizard --extra trafficsim --extra transfuser --extra recipes; \
+      else \
+        uv sync --extra all --extra recipes; \
+      fi'
 
 ARG PYTORCH_VERSION=2.8.0+cu128
 ARG TORCH_CLUSTER_VERSION=1.6.3
