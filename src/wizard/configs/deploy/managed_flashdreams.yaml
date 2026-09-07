@@ -37,7 +37,7 @@ services:
       - FLASHDREAMS_CACHE_DIR=/root/.cache/flashdreams
     workdir: /app
     command:
-      - "python -m omnidreams.grpc.server"
+      - "python -m omnidreams.impl.grpc.server"
       - "--pipeline_config_name omnidreams-sv-2steps-chunk2-loc6-lightvae-lighttae-perf"
       - "--host 0.0.0.0"
       - "--port {port}"
