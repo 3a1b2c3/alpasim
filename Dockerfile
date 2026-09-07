@@ -82,13 +82,20 @@ ARG TORCH_SCATTER_VERSION=2.1.2
 ARG TORCH_SPARSE_VERSION=0.6.18
 
 # Install PyG compiled extensions (torch-cluster, torch-scatter, torch-sparse)
-# from pre-built wheels matching the installed torch + CUDA versions.
+# from pre-built wheels matching the installed torch + CUDA versions. PyG does
+# not publish prebuilt aarch64 wheels for this torch/CUDA combo, so on arm64
+# these build from source; their setup.py needs torch importable but doesn't
+# declare it as a build dependency, so build isolation must be disabled for
+# uv to see the already-installed torch.
 RUN PYG_WHEEL_URL="https://data.pyg.org/whl/torch-${PYTORCH_VERSION}.html" && \
     uv pip install \
         "torch-cluster==${TORCH_CLUSTER_VERSION}" \
         "torch-scatter==${TORCH_SCATTER_VERSION}" \
         "torch-sparse==${TORCH_SPARSE_VERSION}" \
-        -f "$PYG_WHEEL_URL"
+        -f "$PYG_WHEEL_URL" \
+        --no-build-isolation-package torch-cluster \
+        --no-build-isolation-package torch-scatter \
+        --no-build-isolation-package torch-sparse
 
 ENV UV_CACHE_DIR=/tmp/uv-cache
 ENV UV_NO_SYNC=1
