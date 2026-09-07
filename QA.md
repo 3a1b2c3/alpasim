@@ -139,4 +139,54 @@ Note: if you have multiple checkouts of this repo on different machines (e.g.
 editing on a Windows dev box, building on a separate Linux/aarch64 host),
 edits made on one don't appear on the other unless you `git pull`/push
 through a shared remote or copy the file over — check `git remote -v` on
-both sides before assuming a fix "took."
+both sides before assuming a fix "took." If the two checkouts have
+*different* `origin` remotes (e.g. one points at a personal fork, the other
+at the upstream repo directly), `git pull` will never bring changes across —
+push to whichever remote is reachable from both, or just `curl` the raw file
+from the pushed side (`https://raw.githubusercontent.com/<user>/<repo>/<branch>/<path>`)
+on the other.
+
+### `uv sync`/build succeeds but `docker build` still fails identically after "fixing" the Dockerfile
+
+Cause: on a flaky terminal/SSH session, multi-line pastes (heredocs,
+backslash-continued shell blocks) can silently corrupt — lines dropped,
+`\`-continuations collapsed onto one line, or a redirect (`> file`)
+interrupted mid-write leaving a truncated file. The edit looks applied in
+your scrollback but isn't actually on disk.
+
+Fix: verify, don't assume. After any patch, check concrete facts about the
+file — `wc -l Dockerfile` (expected line count) and `grep -c <marker text>
+Dockerfile` (expected match count) — rather than re-reading old build output.
+When patching multi-line blocks by hand on a flaky terminal, prefer reducing
+the edit to a single line (e.g. base64-encode the replacement text and decode
+it in one `python3 -c` command, or base64-encode+`curl` a whole replacement
+file) instead of pasting raw multi-line heredocs or `sed`/`patch` blocks.
+
+### `torch-cluster`/`torch-scatter`/`torch-sparse` build error: `ModuleNotFoundError: No module named 'torch'`
+
+Cause: PyG (`data.pyg.org`) does not publish aarch64 wheels for this
+torch/CUDA combination, so `uv pip install -f <pyg wheel index>` falls back
+to building `torch-cluster`/`torch-scatter`/`torch-sparse` from source.
+Their `setup.py` needs `torch` importable at build time but doesn't declare
+it as a build dependency (`build-system.requires`), so uv's isolated build
+sandbox — which starts from a clean environment — can't see the already
+-installed `torch`.
+
+Fix: tell `uv pip install` to skip build isolation for those three packages
+so the build step can see the environment's `torch`:
+
+```bash
+uv pip install \
+    "torch-cluster==${TORCH_CLUSTER_VERSION}" \
+    "torch-scatter==${TORCH_SCATTER_VERSION}" \
+    "torch-sparse==${TORCH_SPARSE_VERSION}" \
+    -f "$PYG_WHEEL_URL" \
+    --no-build-isolation-package torch-cluster \
+    --no-build-isolation-package torch-scatter \
+    --no-build-isolation-package torch-sparse
+```
+
+Already applied in this repo's `Dockerfile` (search for
+`no-build-isolation-package`) — applied unconditionally since it's a no-op
+on platforms where a prebuilt wheel installs without triggering a source
+build.
